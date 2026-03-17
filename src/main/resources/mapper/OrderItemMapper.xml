@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.OrderItemMapper">
+
+    <!-- ============================================================ -->
+    <!--  ResultMap                                                    -->
+    <!-- ============================================================ -->
+    <resultMap id="BaseResultMap" type="OrderItem">
+        <id     column="id"          property="id"/>
+        <result column="order_no"    property="orderNo"/>
+        <result column="sku_code"    property="skuCode"/>
+        <result column="quantity"    property="quantity"/>
+        <result column="price"       property="price"/>
+        <result column="status"      property="status"/>
+        <result column="remark"      property="remark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, order_no, sku_code, quantity, price, status, remark, create_time, update_time
+    </sql>
+
+    <!-- ============================================================ -->
+    <!--  单行 CRUD                                                    -->
+    <!-- ============================================================ -->
+
+    <!--
+      PostgreSQL 用 useGeneratedKeys + keyProperty 回填自增 id。
+      keyColumn 显式指定列名，避免驼峰映射干扰。
+    -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO order_item (order_no, sku_code, quantity, price, status, remark)
+        VALUES (#{orderNo}, #{skuCode}, #{quantity}, #{price}, #{status}, #{remark})
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM order_item
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM order_item
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!--
+      单行更新：字段为 null 时跳过。
+      供 Service 层 ExecutorType.BATCH 循环调用，
+      MyBatis 批处理模式下多次调用同一 Statement 只发送一次预编译，
+      再统一 flush，显著降低网络往返次数。
+    -->
+    <update id="updateById">
+        UPDATE order_item
+        <set>
+            <if test="quantity != null">
+                quantity    = #{quantity},
+            </if>
+            <if test="price != null">
+                price       = #{price},
+            </if>
+            <if test="status != null">
+                status      = #{status}::smallint,
+            </if>
+            <if test="remark != null">
+                remark      = #{remark},
+            </if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- ============================================================ -->
+    <!--  方式二：单条 CASE WHEN SQL（PostgreSQL 兼容）               -->
+    <!--                                                              -->
+    <!--  生成 SQL 示意：                                             -->
+    <!--  UPDATE order_item SET                                       -->
+    <!--    quantity = CASE id WHEN 1 THEN ? WHEN 2 THEN ? END,      -->
+    <!--    status   = CASE id WHEN 1 THEN ?::smallint ... END,       -->
+    <!--    ...                                                       -->
+    <!--  WHERE id IN (1, 2, ...)                                     -->
+    <!-- ============================================================ -->
+    <update id="batchUpdateByCaseWhen">
+        UPDATE order_item
+        <trim prefix="SET" suffixOverrides=",">
+            quantity =
+            <foreach collection="items" item="item" open="CASE id" close="END," separator=" ">
+                WHEN #{item.id} THEN #{item.quantity}
+            </foreach>
+
+            price =
+            <foreach collection="items" item="item" open="CASE id" close="END," separator=" ">
+                WHEN #{item.id} THEN #{item.price}
+            </foreach>
+
+            <!--
+              PostgreSQL CASE WHEN 推断类型为 integer，
+              status 列定义为 smallint，需显式转换
+            -->
+            status =
+            <foreach collection="items" item="item" open="CASE id" close="END::smallint," separator=" ">
+                WHEN #{item.id} THEN #{item.status}
+            </foreach>
+
+            remark =
+            <foreach collection="items" item="item" open="CASE id" close="END," separator=" ">
+                WHEN #{item.id} THEN #{item.remark}
+            </foreach>
+
+            update_time = NOW()
+        </trim>
+        WHERE id IN
+        <foreach collection="items" item="item" open="(" separator="," close=")">
+            #{item.id}
+        </foreach>
+    </update>
+
+    <!-- ============================================================ -->
+    <!--  方式三：INSERT ... ON CONFLICT DO UPDATE（PostgreSQL upsert）-->
+    <!--  MySQL 的 ON DUPLICATE KEY UPDATE 对应 PostgreSQL 的          -->
+    <!--  ON CONFLICT (conflict_target) DO UPDATE SET ...             -->
+    <!-- ============================================================ -->
+    <insert id="batchUpsert">
+        INSERT INTO order_item (id, order_no, sku_code, quantity, price, status, remark)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (<choose>
+                <when test="item.id != null">#{item.id}</when>
+                <otherwise>DEFAULT</otherwise>
+             </choose>, #{item.orderNo}, #{item.skuCode},
+             #{item.quantity}, #{item.price}, #{item.status}::smallint, #{item.remark})
+        </foreach>
+        ON CONFLICT (id) DO UPDATE SET
+            quantity    = EXCLUDED.quantity,
+            price       = EXCLUDED.price,
+            status      = EXCLUDED.status,
+            remark      = EXCLUDED.remark,
+            update_time = NOW()
+    </insert>
+
+</mapper>

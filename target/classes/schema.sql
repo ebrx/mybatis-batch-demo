@@ -1,0 +1,2 @@
+-- 此文件已迁移至 init.sql（PostgreSQL 完整初始化脚本）
+-- 请执行 init.sql 完成数据库/用户/建表初始化

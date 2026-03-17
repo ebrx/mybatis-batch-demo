@@ -1,0 +1,7 @@
+com/example/demo/DemoApplication.class
+com/example/demo/mapper/OrderItemMapper.class
+com/example/demo/controller/OrderItemController.class
+com/example/demo/service/OrderItemService.class
+com/example/demo/config/MyBatisConfig.class
+com/example/demo/service/OrderItemService$BatchExecutor.class
+com/example/demo/entity/OrderItem.class

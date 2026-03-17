@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/demo_db?useUnicode=true&characterEncoding=UTF-8&TimeZone=Asia/Shanghai&reWriteBatchedInserts=true
+    username: demo_user
+    password: Demo@2026!
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.example.demo.entity
+  configuration:
+    # 开启驼峰映射
+    map-underscore-to-camel-case: true
+    # 日志打印 SQL（生产环境可改为 WARN）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+logging:
+  level:
+    com.example.demo.mapper: debug
